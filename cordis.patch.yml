@@ -1,0 +1,9 @@
+# ultra-documents — dsh bundle patch.
+#
+# Install into a profile:
+#   dsh plugin --profile web add ultra-documents
+# Local development:
+#   dsh plugin --profile web add link:<absolute path to this directory>
+- insert:
+    - id: ultra-documents
+      name: ultra-documents

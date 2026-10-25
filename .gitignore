@@ -1,0 +1,12 @@
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+
+# Node
+node_modules/
+npm-debug.log
+*.tgz
+
+# Documents created while trying the plugin in this checkout
+.ultra-documents/

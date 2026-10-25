@@ -1,0 +1,73 @@
+{
+  "name": "ultra-documents",
+  "version": "0.1.0",
+  "description": "Artifacts-like documents for DeepSeek Harness: the agent writes an HTML document, it opens in the dsh sidebar, you comment on any part, and one click sends the comments back for the next version. A local-only fork of tdoc.",
+  "type": "module",
+  "main": "index.js",
+  "license": "AGPL-3.0-or-later",
+  "author": "libraqg",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "documents",
+    "artifacts",
+    "comments",
+    "html"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Libraqg/ultra-documents.git"
+  },
+  "homepage": "https://github.com/Libraqg/ultra-documents#readme",
+  "bugs": {
+    "url": "https://github.com/Libraqg/ultra-documents/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.js",
+    "skills",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "NOTICE.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-files",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ]
+    },
+    "compatibility": {
+      "dsh": ">=0.2.1-rc.2 <0.3.0-0",
+      "tested": [
+        "0.2.1-rc.3"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "check": "node scripts/build-client.mjs --check && node --check index.js && node --check client.js && node --check lib/store.js && node --check lib/files.js && node --check lib/commands.js && node --check lib/tools.js && node --check lib/define-tool.js",
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -1,0 +1,110 @@
+# Visuals — required for every generated doc
+
+**Read this before writing doc HTML**, on every `ultra_documents_create` and
+every `ultra_documents_revise`. It applies under every style. Voice governs the
+words; this governs how much of the doc is a picture instead of words.
+
+## Be visual-first
+
+Draw generously. If a claim has data, a comparison, a structure, a sequence, or
+a tradeoff in it, **draw it** — prose is the connective tissue between visuals,
+not the main body. Aim for a visual roughly every screenful, wherever in the
+doc the material earns one.
+
+The host runs no author JavaScript. Use SVG/CSS for inline visuals; optional
+provider-owned editors can also supply a static SVG snapshot. An SVG chart is also a commentable artifact, which is
+the point of an ultra document. Draw honestly: real numbers, labeled axes, no chartjunk.
+
+## Match the visual to the data
+
+Pick by what the data *is*:
+
+| The data is… | Reach for |
+|---|---|
+| quantities being compared | a **bar chart** (or horizontal bars for long labels) |
+| a tradeoff / relationship (X vs Y) | a **scatter or line chart** with real axes |
+| a trend over time | a **line chart** |
+| where things sit on two axes | a **quadrant / positioning map** |
+| a feature comparison | a **matrix** with ✓ / ✗ / ~ marks |
+| a few key numbers | **stat tiles** (big number + label) |
+| a sequence of events | a **timeline** |
+| a process with branches | a **flow diagram** (only when it truly is a flow) |
+| the composition of a whole | a **stacked bar** or parts-of-100 bar |
+| many attributes across a few items | a **radar** or **small multiples** |
+| a magnitude on a scale | a **gauge / meter / progress bar** |
+
+Most non-trivial docs carry **several different types**, not one repeated. A
+competitor analysis wants stat tiles + a positioning map + a comparison matrix
++ maybe a bar chart. A technical design wants an architecture diagram + a
+sequence + a metrics row. Reach for the variety the content earns.
+
+## The style owns the look, not the choice
+
+Which visual to draw is content-driven (this file). How it looks — colors,
+strokes, fills, fonts, textures — is the style's job. Every style ships a
+diagram vocabulary and a palette; use it. A bar chart in the default style is
+black bars on white with one accent; in `paper` it is clay bars on warm
+paper; in `technical` it flips with the theme. Same chart type, styled per
+style.
+
+## Draw to the edge of the viewBox
+
+A figure sits in the same column as the prose, so its drawing has to start
+where the text starts. The viewBox is the frame, not a mat: padding baked into
+it pushes the ink inward and the figure reads as indented against every
+paragraph around it.
+
+Set the viewBox to the drawing's own bounds. If the leftmost stroke is at
+`x=14`, the viewBox starts at 14 — not at 0 with fourteen units of nothing.
+Space between a figure and the text above it is the job of CSS margin on the
+wrapper, where it applies to the box rather than the picture inside it.
+
+Two failures, both invisible until a phone narrows the column:
+
+- **Baked padding.** `viewBox="0 0 120 64"` around ink that spans `x=34..86`
+  wastes 28% of the width on each side. At a 164px card that is 46px of
+  indent, against a paragraph that starts at 0.
+- **Ragged starts across a set.** A row of glyphs drawn one at a time ends up
+  with each one starting somewhere different — 6, 14, 20, 34 — and the row
+  reads as broken even though every figure is individually fine. Draw a set on
+  one geometry: same left edge, same right edge, same optical weight.
+
+Nothing checks this for you: before shipping a figure, check that its
+left-hand ink is flush with its box, including inside hand-drawn `<path>`s.
+
+## Keep them commentable and responsive
+
+Wrap wide charts in `<div class="diagram-box">` (or `tdoc-table-scroll` for
+tables) so they scroll on a phone instead of overflowing. Tag an author-built
+figure `data-tdoc-artifact` if it is a composed block rather than a single
+`<svg>`, so a reader can comment on it as a unit.
+
+
+## Width and visual verification
+
+Width is independent of house style. Use the default reading column for prose;
+use `<div class="wrap" data-tdoc-width="wide">` for a diagram-heavy design or
+comparison that needs the available page width. Both keep template spacing.
+A larger page does not fix labels that overlap or escape their SVG boxes.
+
+The sidebar injects the reader styles when it renders a version. Nothing runs
+a rendered layout audit. Review the source for readable
+labels, wrapping text and intentional local scrolling. If a preview is available,
+inspect phone and desktop layouts in it without installing additional tools.
+Do not describe an uninspected document as visually verified.
+
+Use `data-tdoc-cell="value"` on atomic amounts/units, statuses or identifiers.
+Keep prose wrappable. The shared table policy measures each cell's unwrapped
+ink, reserves its natural width up to a 12em prose reading measure (uncapped
+for explicit values), and allows the wrapper to scroll when needed. It does
+not guess meaning from a column number, header label or language. Existing
+explicit line breaks, merged cells and author card reflows remain intact.
+The policy protects hosted readers, including old versions and browser edits;
+its transient style is not serialized into author HTML. Check standalone
+exports separately. The reader protection applies to CLI uploads, direct HTTP
+uploads and browser saves; it is not proof that every author layout is correct.
+
+Use the figure sizing and text rules in `authoring/structure/components.md`.
+In a preview, inspect label fit, arrow meaning and table readability. On phones,
+keep necessary scrolling local and hint when content continues off-screen.
+Never hide page overflow: that makes content inaccessible.
