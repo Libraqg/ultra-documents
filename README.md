@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 Artifacts-like documents for [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) (dsh).
 
+**Get documents you can comment on, hand back to the AI for the next version, and edit yourself, right in the dsh sidebar.**
+
 Ask the agent for a report, proposal, explainer, slide deck, diagram or
 dashboard. It writes one self-contained HTML page, which shows up in the chat
 as a card and opens in the dsh right sidebar. Then:
@@ -74,6 +76,24 @@ Documents run in an `<iframe sandbox="allow-scripts">` without same-origin
 access: their scripts cannot reach the dsh page, its cookies or your files.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design.
+
+## Permissions and risks
+
+- **Files:** writes only inside `<workspace>/.ultra-documents/`. The host side
+  writes with Node `fs` and refuses any path that resolves outside the
+  workspace, including through symlinks. Drafts are read only from regular
+  files inside the workspace.
+- **What it adds to dsh:** four agent tools, one skill, one slash command
+  (`/ultra-documents`, used by the sidebar to save comments and edits) and a
+  sidebar renderer for `*.ultra.html` files.
+- **Network and external services:** the plugin makes no network requests and
+  uses no external service. A document the agent writes may load fonts or
+  libraries from a CDN when it is displayed.
+- **Model usage:** creating a document and Send to AI use your configured
+  model and its tokens. Comments and direct edits do not.
+- **Document scripts:** run in a sandboxed iframe with no access to the dsh
+  page, its cookies or your files; they can only open a link when you click
+  it.
 
 ## Known limitations
 
