@@ -68,6 +68,10 @@
   "scripts": {
     "build": "node scripts/build-client.mjs",
     "check": "node scripts/build-client.mjs --check && node --check index.js && node --check client.js && node --check lib/store.js && node --check lib/files.js && node --check lib/commands.js && node --check lib/tools.js && node --check lib/define-tool.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "npm run check && npm test"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

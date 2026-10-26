@@ -2,6 +2,8 @@
 
 [English](README.md) | 中文
 
+[![npm](https://img.shields.io/npm/v/ultra-documents)](https://www.npmjs.com/package/ultra-documents) [![test](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml/badge.svg)](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml)
+
 给 [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh)（dsh）用的、类似 Claude Artifacts 的文档插件。
 
 **在 dsh 侧边栏里得到可以批注、一键交给 AI 改出新版本、也能自己直接修改的文档。**
@@ -27,6 +29,12 @@ HTML 页面，在对话里显示为一张卡片，点开就在 dsh 右侧边栏�
 ## 安装
 
 需要 dsh 0.2.1 或更高版本，以及它的网页界面（桌面版或 `dsh web`）。
+
+```bash
+dsh plugin --profile web add ultra-documents
+```
+
+不经过 npm、直接从 GitHub 源码安装：
 
 ```bash
 dsh plugin --profile web add github:Libraqg/ultra-documents

@@ -2,6 +2,8 @@
 
 English | [中文](README.zh.md)
 
+[![npm](https://img.shields.io/npm/v/ultra-documents)](https://www.npmjs.com/package/ultra-documents) [![test](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml/badge.svg)](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml)
+
 Artifacts-like documents for [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) (dsh).
 
 **Get documents you can comment on, hand back to the AI for the next version, and edit yourself, right in the dsh sidebar.**
@@ -32,6 +34,12 @@ stays on your machine: no account, no server, no sharing.
 
 Requires dsh 0.2.1 or later and its web interface (the desktop app or
 `dsh web`).
+
+```bash
+dsh plugin --profile web add ultra-documents
+```
+
+From GitHub source instead of npm:
 
 ```bash
 dsh plugin --profile web add github:Libraqg/ultra-documents
