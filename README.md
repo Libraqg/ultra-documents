@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-[![npm](https://img.shields.io/npm/v/ultra-documents)](https://www.npmjs.com/package/ultra-documents) [![test](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml/badge.svg)](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml) [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/libraqg/ultra-documents)
+[![npm](https://img.shields.io/npm/v/ultra-documents)](https://www.npmjs.com/package/ultra-documents) [![test](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml/badge.svg)](https://github.com/Libraqg/ultra-documents/actions/workflows/test.yml) [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/libraqg/ultra-documents) [![DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 Artifacts-like documents for [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) (dsh).
 
