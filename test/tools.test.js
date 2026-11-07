@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 import { registerTools } from '../lib/tools.js'
 
 const HTML = '<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><main><p>Hi</p></main></body></html>'
@@ -55,4 +55,55 @@ test('exactly one of html and source_path is required', async () => {
     await assert.rejects(call('ultra_documents_create', { title: 'X' }), /exactly one/)
     await assert.rejects(call('ultra_documents_create', { title: 'X', html: HTML, source_path: 'a.html' }), /exactly one/)
   })
+})
+
+// A create inside an open turn queues a deliverable card, appended once the
+// tool result arrives. dsh 0.2.2 answers through agents.turnBoundaryOf; older
+// hosts only through the deprecated sessionProjections.stateOf.
+async function deliveredFiles(hostFace) {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'ultra-deliver-')))
+  try {
+    const tools = new Map()
+    const listeners = new Map()
+    const appended = []
+    const ctx = {
+      tools: { register: tool => tools.set(tool.name, tool) },
+      workingDirectory: { ensure: async () => dir },
+      fs: { resolve: async p => resolvePath(dir, p), processPath: p => p },
+      on: (name, fn) => listeners.set(name, fn),
+      ...hostFace,
+    }
+    registerTools(ctx)
+    const session = { append: (type, payload) => appended.push([type, payload]) }
+    const exec = { agent: { session }, callId: 'call-1', signal: new AbortController().signal }
+    await tools.get('ultra_documents_create').execute({ title: 'Plan', html: HTML }, exec)
+    listeners.get('tools/result')(exec, { isError: false })
+    return appended
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+const OPEN_TURN = { openTurnStartSeq: 4, lastTurn: 2 }
+
+test('the deliverable card uses agents.turnBoundaryOf when the host has it', async () => {
+  const appended = await deliveredFiles({
+    agents: { turnBoundaryOf: () => OPEN_TURN },
+    sessionProjections: { stateOf: () => { throw new Error('deprecated reader used') } },
+  })
+  assert.equal(appended.length, 1)
+  assert.equal(appended[0][0], 'deliverables/presented')
+  assert.equal(appended[0][1].turn, 2)
+  assert.match(appended[0][1].files[0].path, /plan\/v1\.ultra\.html$/)
+})
+
+test('the deliverable card falls back to sessionProjections on older hosts', async () => {
+  const appended = await deliveredFiles({ agents: {}, sessionProjections: { stateOf: (_s, key) => key === 'turnBoundary' ? OPEN_TURN : undefined } })
+  assert.equal(appended.length, 1)
+  assert.equal(appended[0][1].turn, 2)
+})
+
+test('no deliverable card outside an open turn', async () => {
+  const appended = await deliveredFiles({ agents: { turnBoundaryOf: () => ({ openTurnStartSeq: null, lastTurn: 2 }) } })
+  assert.equal(appended.length, 0)
 })

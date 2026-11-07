@@ -25,7 +25,7 @@ export function parseSkill(text) {
 export function apply(ctx) {
   ctx.plugin({
     name: 'ultra-documents/tools',
-    inject: ['tools', 'fs', 'workingDirectory', 'sessionProjections'],
+    inject: ['tools', 'fs', 'workingDirectory', 'agents', 'sessionProjections'],
     apply: registerTools,
   })
 

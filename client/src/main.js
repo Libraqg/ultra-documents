@@ -1,8 +1,8 @@
 // ultra-documents — web client (body of the __ModuleLoader__ factory).
 //
-// scripts/build-client.mjs wraps this file into client.js and replaces the two
+// scripts/build-client.mjs wraps this file into client.js and replaces the
 // placeholders below with the frame probe and the reader stylesheet, both
-// inherited from tdoc.
+// inherited from tdoc, and with the package version.
 //
 // What it registers: a document-preview implementation for *.ultra.html files
 // and its body on the keyed slot `sidebar.right.tab.document`. The body renders
@@ -10,6 +10,10 @@
 // to tdoc's frame probe over postMessage for selections and highlights, saves
 // comments through the host `/ultra-documents` command, and sends open comments
 // to the Session with `remote.session.prompt`.
+//
+// Where the host runs dsh's plugin manager, it also asks that manager for a
+// newer published version and, when there is one, shows an update button in
+// the document bar; the button hands the update to the same manager.
 
 const React = require('react')
 const ReactDOM = require('react-dom')
@@ -18,12 +22,18 @@ const { useCallback, useEffect, useMemo, useRef, useState } = React
 
 const FRAME_PROBE = __FRAME_PROBE__
 const READER_CSS = __READER_CSS__
+const PACKAGE_VERSION = __PACKAGE_VERSION__
 
 const IMPL_ID = 'ultra-documents'
 const LOCALE_ID = 'ultraDocuments'
 const COMMAND = 'ultra-documents'
 const POLL_MS = 3000
 const FILE_ADDRESS_PREFIX = 'dsh-resource://file/'
+const PACKAGE_NAME = 'ultra-documents'
+// Each check runs `pnpm view` on the host, so one answer is reused for a while.
+const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000
+const UPDATE_CACHE_KEY = 'ultra-documents.update-check'
+const UPDATE_CONFIRM_MS = 5000
 
 const zh = {
   title: '批注文档',
@@ -84,6 +94,14 @@ const zh = {
   fmtQuote: '引用',
   fmtUndo: '撤销',
   fmtRedo: '重做',
+  updateAvailable: '可更新 v{to}',
+  updateAvailableHint: 'ultra-documents 有新版本：v{from} → v{to}，点击后再确认一次即可更新',
+  updateConfirm: '确认更新到 v{to}',
+  updating: '正在更新…',
+  updateRestart: '重启 dsh 后生效',
+  updateRestartHint: '已更新到 v{to}，重启 dsh 后生效',
+  updateFailed: '更新失败，点此重试',
+  updateFailedHint: '更新失败：{error}',
   prompt: '请根据我的批注修改 ultra 文档《{title}》（slug: {slug}，当前最新 v{latest}）。待处理批注 {n} 条：{ids}。请先调用 ultra_documents_comments 读取批注，再用 ultra_documents_revise 写出新版本，并逐条回复。',
 }
 
@@ -146,6 +164,14 @@ const en = {
   fmtQuote: 'Quote',
   fmtUndo: 'Undo',
   fmtRedo: 'Redo',
+  updateAvailable: 'Update to v{to}',
+  updateAvailableHint: 'A new ultra-documents version is out: v{from} → v{to}. Click, then confirm, to update',
+  updateConfirm: 'Confirm update to v{to}',
+  updating: 'Updating…',
+  updateRestart: 'Restart dsh to finish',
+  updateRestartHint: 'Updated to v{to}; it takes effect after dsh restarts',
+  updateFailed: 'Update failed, click to retry',
+  updateFailedHint: 'Update failed: {error}',
   prompt: 'Please revise ultra document "{title}" (slug: {slug}, latest v{latest}) from my comments. {n} open comment(s): {ids}. Call ultra_documents_comments to read them, then write the next version with ultra_documents_revise and reply to each one.',
 }
 
@@ -280,6 +306,147 @@ function newRequestId() {
   return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'ud-' + Date.now() + '-' + Math.random().toString(16).slice(2)
 }
 
+// ---- update check -------------------------------------------------------------
+
+// The newest version from a plugin manager `listVersions` answer that can
+// replace this one: it declares a bundle, accepts the running dsh and is not
+// deprecated; a prerelease is offered only to an installed prerelease.
+function pickUpdate(list) {
+  if (!list || list.status !== 'listed') return null
+  const onPrerelease = String(list.installed).includes('-')
+  const target = (list.versions || []).find(v => v.bundle && !v.incompatible && !v.deprecated && (onPrerelease || !v.prerelease))
+  return target ? { from: list.installed, to: target.version, registry: list.registry } : null
+}
+
+// A cached answer counts only for the version that asked and only for
+// UPDATE_CHECK_MS; storage can be missing or throw.
+function readUpdateCache(now) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(UPDATE_CACHE_KEY) || 'null')
+    if (cached && cached.version === PACKAGE_VERSION && now - cached.checkedAt < UPDATE_CHECK_MS) return cached
+  } catch {}
+  return null
+}
+
+function writeUpdateCache(entry) {
+  try {
+    if (entry) localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify(entry))
+    else localStorage.removeItem(UPDATE_CACHE_KEY)
+  } catch {}
+}
+
+// Shared between the update-check child plugin and every open document body.
+// phase: idle (no button) | available | confirm | updating | restart | failed
+const updateState = {
+  value: { phase: 'idle' },
+  listeners: new Set(),
+  run: null,
+  set(next) {
+    this.value = next
+    for (const listener of this.listeners) listener(next)
+  },
+}
+
+function useUpdateState() {
+  const [state, setState] = useState(updateState.value)
+  useEffect(() => {
+    updateState.listeners.add(setState)
+    setState(updateState.value)
+    return () => { updateState.listeners.delete(setState) }
+  }, [])
+  return state
+}
+
+// Runs only where the host serves `remote.pluginManager`; without it (an older
+// dsh, or a profile without plugin management) the button never shows.
+function watchForUpdates(ctx) {
+  let offer = null
+  let confirmTimer = null
+
+  async function check() {
+    if (updateState.value.phase !== 'idle' && updateState.value.phase !== 'available') return
+    const now = Date.now()
+    const cached = readUpdateCache(now)
+    if (cached) {
+      offer = cached.offer
+    } else {
+      try {
+        const answer = await ctx.remote.pluginManager.listVersions(PACKAGE_NAME, {})
+        if (!answer || answer.ok !== true) return
+        offer = pickUpdate(answer.value)
+        writeUpdateCache({ version: PACKAGE_VERSION, checkedAt: now, offer })
+      } catch {
+        return
+      }
+    }
+    updateState.set(offer ? { phase: 'available', ...offer } : { phase: 'idle' })
+  }
+
+  // First click arms the button, a second one within UPDATE_CONFIRM_MS updates.
+  updateState.run = async () => {
+    const current = updateState.value
+    if (!offer || current.phase === 'updating' || current.phase === 'restart') return
+    if (current.phase !== 'confirm') {
+      updateState.set({ phase: 'confirm', ...offer })
+      clearTimeout(confirmTimer)
+      confirmTimer = setTimeout(() => {
+        if (updateState.value.phase === 'confirm') updateState.set({ phase: 'available', ...offer })
+      }, UPDATE_CONFIRM_MS)
+      return
+    }
+    clearTimeout(confirmTimer)
+    updateState.set({ phase: 'updating', ...offer })
+    writeUpdateCache(null)
+    try {
+      const outcome = unwrap(await ctx.remote.pluginManager.updateBundle(PACKAGE_NAME, offer.to, { registry: offer.registry, requestId: newRequestId() }))
+      const result = outcome.result || {}
+      // With hot reload an applied update replaces this module, and the new
+      // version starts without a button; nothing to show here.
+      if (result.application === 'applied' && !outcome.restore) updateState.set({ phase: 'idle' })
+      else if (result.application === 'restart-required' && !outcome.restore) updateState.set({ phase: 'restart', ...offer })
+      else throw new Error((result.error && (result.error.message || result.error.code)) || result.application || 'update failed')
+    } catch (e) {
+      updateState.set({ phase: 'failed', ...offer, error: String(e && e.message || e) })
+    }
+  }
+
+  check()
+  ctx.effect(() => {
+    const timer = setInterval(check, UPDATE_CHECK_MS)
+    return () => {
+      clearInterval(timer)
+      clearTimeout(confirmTimer)
+      updateState.run = null
+      updateState.set({ phase: 'idle' })
+    }
+  }, 'ultra-documents: update check')
+}
+
+function UpdateButton({ t }) {
+  const state = useUpdateState()
+  if (state.phase === 'idle') return null
+  const values = { from: state.from, to: state.to, error: state.error }
+  const label = {
+    available: t('updateAvailable'),
+    confirm: t('updateConfirm'),
+    updating: t('updating'),
+    restart: t('updateRestart'),
+    failed: t('updateFailed'),
+  }[state.phase]
+  const hint = {
+    available: t('updateAvailableHint'),
+    confirm: t('updateAvailableHint'),
+    restart: t('updateRestartHint'),
+    failed: t('updateFailedHint'),
+  }[state.phase]
+  return h('button', {
+    className: 'ud-btn ud-update' + (state.phase === 'confirm' ? ' ud-primary' : ''),
+    title: hint ? fill(hint, values) : undefined,
+    disabled: state.phase === 'updating' || state.phase === 'restart',
+    onClick: () => updateState.run && updateState.run(),
+  }, fill(label, values))
+}
+
 const STYLE = `
 .ud-root{display:flex;flex-direction:column;height:100%;min-height:0;font:inherit;color:inherit}
 .ud-full{position:fixed;inset:0;z-index:2147483000;background:var(--ud-bg,#fff);display:flex;flex-direction:column}
@@ -291,6 +458,7 @@ const STYLE = `
 .ud-btn.ud-primary{background:#1652f0;border-color:#1652f0;color:#fff}
 .ud-btn.ud-primary:hover:not(:disabled){background:#1245d0}
 .ud-btn.ud-on{background:rgba(22,82,240,.14);border-color:rgba(22,82,240,.5)}
+.ud-btn.ud-update:not(.ud-primary){border-color:rgba(18,140,80,.55);color:#12804f}
 .ud-select{font:inherit;font-size:12px;padding:3px 4px;border-radius:6px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit}
 .ud-banner{padding:6px 10px;font-size:12px;background:rgba(22,82,240,.1);display:flex;gap:8px;align-items:center}
 .ud-note{padding:6px 10px;font-size:12px;opacity:.75}
@@ -639,6 +807,7 @@ function createBody(ctx) {
         value: viewVersion,
         onChange: e => { setViewVersion(Number(e.target.value)); setPending(null) },
       }, versions.map(n => h('option', { key: n, value: n }, 'v' + n))),
+      h(UpdateButton, { t }),
       editing ? null : h('button', {
         className: 'ud-btn' + (mode === 'comment' ? ' ud-on' : ''),
         title: t('modeHint'),
@@ -747,4 +916,13 @@ module.exports.apply = ctx => {
     key: IMPL_ID,
     locale: LOCALE_ID,
   }, createBody(ctx))), 'ultra-documents: body')
+  // A child plugin, so a host without the plugin manager remote leaves only
+  // this part unstarted.
+  ctx.plugin({
+    name: 'ultra-documents/update-check',
+    inject: ['remote', 'remote.pluginManager'],
+    apply: watchForUpdates,
+  })
 }
+
+module.exports.pickUpdate = pickUpdate

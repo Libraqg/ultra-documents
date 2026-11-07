@@ -71,6 +71,16 @@ desktop profile is managed by the app.
 Start a new session for each document: a long session carries a lot of
 context into every revision.
 
+### Updates
+
+On dsh 0.2.2 or later, when ultra-documents was installed from npm, the
+document bar shows an **Update to vX** button once a newer version is
+published. Click it, then click **Confirm** within five seconds; dsh's plugin
+manager installs the new version and puts the old one back if that fails.
+There is no pop-up, and nothing shows when you are up to date, on an older
+dsh, or on a GitHub or local install. The check runs at most once every six
+hours.
+
 ## How it works
 
 | Piece | What it does |
@@ -94,8 +104,11 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the design.
 - **What it adds to dsh:** four agent tools, one skill, one slash command
   (`/ultra-documents`, used by the sidebar to save comments and edits) and a
   sidebar renderer for `*.ultra.html` files.
-- **Network and external services:** the plugin makes no network requests and
-  uses no external service. A document the agent writes may load fonts or
+- **Network and external services:** the plugin itself makes no network
+  requests and uses no external service. For the update check it asks dsh's
+  plugin manager, which looks up the `ultra-documents` package on your
+  configured npm registry (`pnpm view`) at most once every six hours; nothing
+  about your documents is sent. A document the agent writes may load fonts or
   libraries from a CDN when it is displayed.
 - **Model usage:** creating a document and Send to AI use your configured
   model and its tokens. Comments and direct edits do not.
@@ -115,7 +128,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the design.
 - The sidebar polls for changes every 3 seconds, and a document opened before
   a light/dark theme switch keeps its old theme until it is reopened.
 - Local filesystem only; Sessions on a remote filesystem are not supported.
-- dsh is a release candidate. Tested on 0.2.1-rc.3.
+- dsh is a release candidate. Tested on 0.2.1-rc.3 and 0.2.2-rc.1.
 
 ## Develop
 

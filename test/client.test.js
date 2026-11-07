@@ -32,12 +32,13 @@ test('client.js registers under the package name', async () => {
 
 test('apply registers the .ultra.html preview and its sidebar body', async () => {
   const { exports } = await loadClient()
-  const calls = { locale: [], previews: [], slots: [] }
+  const calls = { locale: [], previews: [], slots: [], plugins: [] }
   const ctx = {
     effect: fn => fn(),
     locale: { bind: () => key => key, register: (id, dicts) => calls.locale.push([id, Object.keys(dicts)]) },
     documentPreviews: { register: def => calls.previews.push(def) },
     slots: { inject: (_name, fn) => fn(), register: (meta, component) => calls.slots.push([meta, typeof component]) },
+    plugin: def => calls.plugins.push(def),
   }
   exports.apply(ctx)
   assert.deepEqual(plain(calls.locale), [['ultraDocuments', ['zh', 'en']]])
@@ -49,6 +50,32 @@ test('apply registers the .ultra.html preview and its sidebar body', async () =>
   assert.equal(def.loading, 'bytes-complete')
   assert.equal(def.title(), 'title')
   assert.deepEqual(plain(calls.slots), [[{ name: 'sidebar.right.tab.document', key: 'ultra-documents', locale: 'ultraDocuments' }, 'function']])
+  // The update check is its own child plugin, so a host without the plugin
+  // manager remote still gets the document body.
+  assert.equal(calls.plugins.length, 1)
+  assert.equal(calls.plugins[0].name, 'ultra-documents/update-check')
+  assert.deepEqual(plain(calls.plugins[0].inject), ['remote', 'remote.pluginManager'])
+})
+
+const version = (v, extra = {}) => ({ version: v, tags: [], prerelease: v.includes('-'), bundle: true, ...extra })
+const listed = (installed, versions) => ({ status: 'listed', installed, registry: null, attempts: [], versions, omitted: 0 })
+
+test('pickUpdate offers the newest usable version', async () => {
+  const { exports } = await loadClient()
+  const { pickUpdate } = exports
+  assert.equal(pickUpdate({ status: 'refused', problem: 'not-updatable', reason: '', attempts: [] }), null)
+  assert.equal(pickUpdate(listed('0.1.0', [])), null)
+  assert.deepEqual(plain(pickUpdate(listed('0.1.0', [version('0.3.0-rc.1'), version('0.2.0')]))), { from: '0.1.0', to: '0.2.0', registry: null })
+  // Prereleases only for a prerelease install.
+  assert.equal(pickUpdate(listed('0.1.0', [version('0.2.0-rc.1')])), null)
+  assert.equal(pickUpdate(listed('0.2.0-rc.1', [version('0.2.0-rc.2')])).to, '0.2.0-rc.2')
+  // Skip versions the running dsh rejects, deprecated ones and non-bundles.
+  assert.equal(pickUpdate(listed('0.1.0', [
+    version('0.4.0', { incompatible: { reason: 'engines' } }),
+    version('0.3.0', { deprecated: 'broken' }),
+    version('0.2.1', { bundle: false }),
+    version('0.2.0'),
+  ])).to, '0.2.0')
 })
 
 test('client.js is up to date with its sources', async () => {

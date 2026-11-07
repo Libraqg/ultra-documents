@@ -1,6 +1,6 @@
 {
   "name": "ultra-documents",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Artifacts-like documents for DeepSeek Harness: the agent writes an HTML document, it opens in the dsh sidebar, you comment on any part, and one click sends the comments back for the next version. A local-only fork of tdoc.",
   "type": "module",
   "main": "index.js",
@@ -61,7 +61,8 @@
     "compatibility": {
       "dsh": ">=0.2.1-rc.2 <0.3.0-0",
       "tested": [
-        "0.2.1-rc.3"
+        "0.2.1-rc.3",
+        "0.2.2-rc.1"
       ]
     }
   },
